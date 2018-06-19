@@ -1,4 +1,5 @@
-﻿using System;
+﻿using PythonScriptingEngine;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -10,6 +11,9 @@ namespace TestApp
     {
         static void Main(string[] args)
         {
+            ScriptingEngine se = new ScriptingEngine();
+            se.Initialize();
+            se.LoadScripts(@"C:\Projects\Python Scripting Engine\PythonScriptingEngine\TestScripts\");
         }
     }
 }

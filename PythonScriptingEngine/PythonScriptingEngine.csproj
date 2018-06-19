@@ -7,6 +7,7 @@
   <ItemGroup>
     <PackageReference Include="DynamicLanguageRuntime" Version="1.2.1" />
     <PackageReference Include="IronPython" Version="2.7.8.1" />
+    <PackageReference Include="Microsoft.CSharp" Version="4.5.0" />
   </ItemGroup>
 
 </Project>
