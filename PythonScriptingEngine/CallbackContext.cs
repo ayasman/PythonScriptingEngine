@@ -4,8 +4,7 @@ using System.Text;
 
 namespace PythonScriptingEngine
 {
-    public interface IRegisterableScript
+    public class CallbackContext : ICallbackContext
     {
-        string Name { get; }
     }
 }

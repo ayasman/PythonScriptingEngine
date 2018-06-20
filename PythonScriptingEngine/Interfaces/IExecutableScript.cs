@@ -4,8 +4,8 @@ using System.Text;
 
 namespace PythonScriptingEngine
 {
-    public interface IRegisterableScript
+    public interface IExecutableScript
     {
-        string Name { get; }
+        void Execute();
     }
 }

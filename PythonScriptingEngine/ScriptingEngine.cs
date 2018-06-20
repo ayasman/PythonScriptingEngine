@@ -1,4 +1,5 @@
 ﻿using IronPython.Hosting;
+using Microsoft.Scripting;
 using Microsoft.Scripting.Hosting;
 using System;
 using System.Collections.Generic;
@@ -9,16 +10,26 @@ namespace PythonScriptingEngine
 {
     public class ScriptingEngine
     {
+        Dictionary<string, dynamic> scriptRegistry = new Dictionary<string, dynamic>();
+
         private Dictionary<string, Tuple<ScriptSource, CompiledCode>> scriptFiles = new Dictionary<string, Tuple<ScriptSource, CompiledCode>>();
-        
+
+        private Dictionary<Type, Dictionary<string, dynamic>> registeredScriptObjects = new Dictionary<Type, Dictionary<string, dynamic>>();
         private ScriptEngine pythonEngine;
+        private ScriptScope engineScope;
+        private ICallbackContext callbackContext = new CallbackContext();
+
+        public ICallbackContext CallbackContext => callbackContext;
 
         public void Initialize()
         {
+            Dictionary<string, dynamic> globalObjects = new Dictionary<string, dynamic>();
+            globalObjects.Add("ScriptingEngine", this);
+            globalObjects.Add("CallbackContext", callbackContext);
+
             pythonEngine = Python.CreateEngine();
             pythonEngine.Runtime.LoadAssembly(Assembly.GetExecutingAssembly());
-            //dynamic py = pythonEngine.ExecuteFile(@"C:\Projects\Python Scripting Engine\PythonScriptingEngine\TestScripts\TestScript2.py");
-            //py.obj.add(1, 2);
+            engineScope = pythonEngine.CreateScope(globalObjects);
         }
 
         public void LoadScripts(string directory)
@@ -27,12 +38,30 @@ namespace PythonScriptingEngine
             {
                 try
                 {
-                    dynamic py = pythonEngine.ExecuteFile(file);
-                    dynamic data = py.Register();
+                    scriptRegistry.Add(file, pythonEngine.ExecuteFile(file, engineScope));
                 }
                 catch(Exception ex)
                 {
 
+                }
+            }
+        }
+
+        public void Register(dynamic newObject)
+        {
+            if (newObject is IRegisterableScript)
+            {
+                if (!registeredScriptObjects.ContainsKey(typeof(IRegisterableScript)))
+                    registeredScriptObjects.Add(typeof(IRegisterableScript), new Dictionary<string, dynamic>());
+
+                registeredScriptObjects[typeof(IRegisterableScript)].Add(((IRegisterableScript)newObject).Name, newObject);
+
+                if (newObject is IExecutableScript)
+                {
+                    if (!registeredScriptObjects.ContainsKey(typeof(IExecutableScript)))
+                        registeredScriptObjects.Add(typeof(IExecutableScript), new Dictionary<string, dynamic>());
+
+                    registeredScriptObjects[typeof(IExecutableScript)].Add(((IRegisterableScript)newObject).Name, newObject);
                 }
             }
         }
