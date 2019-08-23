@@ -53,6 +53,10 @@
       <Project>{5e055f63-eba8-4183-8cd2-22ad451392d7}</Project>
       <Name>PythonScriptingEngine</Name>
     </ProjectReference>
+    <ProjectReference Include="..\ScriptingEngine\ScriptingEngine.csproj">
+      <Project>{87093310-9e38-4e1f-a579-2aa2702683f2}</Project>
+      <Name>ScriptingEngine</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="DynamicLanguageRuntime">

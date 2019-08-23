@@ -7,6 +7,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PythonScriptingEngine", "Py
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestApp", "TestApp\TestApp.csproj", "{4374DE51-1CC8-4678-8536-0FB8DDCAE79A}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ScriptingEngine", "ScriptingEngine\ScriptingEngine.csproj", "{ABFAA4E9-8BE2-4C41-8145-23A8FAA2D301}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{4374DE51-1CC8-4678-8536-0FB8DDCAE79A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4374DE51-1CC8-4678-8536-0FB8DDCAE79A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4374DE51-1CC8-4678-8536-0FB8DDCAE79A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ABFAA4E9-8BE2-4C41-8145-23A8FAA2D301}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ABFAA4E9-8BE2-4C41-8145-23A8FAA2D301}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ABFAA4E9-8BE2-4C41-8145-23A8FAA2D301}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ABFAA4E9-8BE2-4C41-8145-23A8FAA2D301}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
