@@ -6,6 +6,8 @@ namespace ScriptingEngine
 {
     public interface IScriptingEngine
     {
-        void RegisterScript(dynamic newObject);
+        void RegisterScript(object newObject);
+
+        void ExecuteScript<T>(string name, object dataContext);
     }
 }

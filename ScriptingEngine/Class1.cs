@@ -6,18 +6,40 @@ using Microsoft.CodeAnalysis.Emit;
 using System.Linq;
 using System.Collections.Generic;
 using System.IO;
+using IronPython.Hosting;
+using Microsoft.Scripting.Hosting;
 
 namespace ScriptingEngine
 {
     public abstract class ScriptingEngineBase : IScriptingEngine
     {
-        protected Dictionary<Type, Dictionary<string, dynamic>> registeredScriptObjects = new Dictionary<Type, Dictionary<string, dynamic>>();
+        protected Dictionary<Type, Dictionary<string, object>> registeredScriptObjects = new Dictionary<Type, Dictionary<string, object>>();
 
-        public abstract void Initialize();
+        public virtual void Initialize()
+        {
+            registeredScriptObjects.Clear();
+        }
 
         public abstract void LoadScripts(string directory);
 
-        public abstract void RegisterScript(dynamic newObject);
+        public virtual void RegisterScript(object newObject)
+        {
+            if (newObject is IRegisterableScript)
+            {
+                if (!registeredScriptObjects.ContainsKey(typeof(IRegisterableScript)))
+                    registeredScriptObjects.Add(typeof(IRegisterableScript), new Dictionary<string, object>());
+
+                registeredScriptObjects[typeof(IRegisterableScript)].Add(((IRegisterableScript)newObject).Name, newObject);
+            }
+        }
+
+        public void ExecuteScript<T>(string name, object dataContext)
+        {
+
+            var scriptObj = registeredScriptObjects[typeof(T)];
+            if (scriptObj is IRegisterableScript)
+                ((IRegisterableScript)scriptObj).Execute(dataContext);
+        }
 
         protected static IEnumerable<string> GetFiles(string path)
         {
@@ -67,6 +89,7 @@ namespace ScriptingEngine
                 typeof(System.Object).GetTypeInfo().Assembly.Location,
                 typeof(Console).GetTypeInfo().Assembly.Location,
                 typeof(IScriptingEngine).GetTypeInfo().Assembly.Location,
+                Assembly.GetExecutingAssembly().Location,
                 System.IO.Path.Combine(System.IO.Path.GetDirectoryName(typeof(System.Runtime.GCSettings).GetTypeInfo().Assembly.Location), "System.Runtime.dll")
             };
             references = refPaths.Select(r => MetadataReference.CreateFromFile(r)).ToArray();
@@ -74,18 +97,8 @@ namespace ScriptingEngine
 
         public override void Initialize()
         {
+            base.Initialize();
             //throw new NotImplementedException();
-        }
-
-        public override void RegisterScript(dynamic newObject)
-        {
-            if (newObject is IRegisterableScript)
-            {
-                if (!registeredScriptObjects.ContainsKey(typeof(IRegisterableScript)))
-                    registeredScriptObjects.Add(typeof(IRegisterableScript), new Dictionary<string, dynamic>());
-
-                registeredScriptObjects[typeof(IRegisterableScript)].Add(((IRegisterableScript)newObject).Name, newObject);
-            }
         }
 
         public override void LoadScripts(string directory)
@@ -147,6 +160,45 @@ namespace ScriptingEngine
                     }
                 }
             }
+        }
+    }
+
+    public class IronPythonScriptingEngine : ScriptingEngineBase
+    {
+        private ScriptEngine pythonEngine;
+        private ScriptScope engineScope;
+
+        public override void Initialize()
+        {
+            base.Initialize();
+
+            Dictionary<string, object> globalObjects = new Dictionary<string, object>();
+            globalObjects.Add("ScriptingEngine", this);
+
+            pythonEngine = Python.CreateEngine();
+            pythonEngine.Runtime.LoadAssembly(Assembly.GetExecutingAssembly());
+            engineScope = pythonEngine.CreateScope(globalObjects);
+        }
+
+        public override void LoadScripts(string directory)
+        {
+            foreach (var file in GetFiles(directory))
+            {
+                try
+                {
+                    //scriptRegistry.Add(file, pythonEngine.ExecuteFile(file, engineScope));
+                    pythonEngine.ExecuteFile(file, engineScope);
+                }
+                catch (Exception ex)
+                {
+
+                }
+            }
+        }
+
+        public void LoadAndExecuteRegister(string scriptText)
+        {
+            pythonEngine.Execute(scriptText, engineScope);
         }
     }
 

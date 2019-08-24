@@ -8,6 +8,6 @@ namespace ScriptingEngine
     {
         string Name { get; }
 
-        void Execute();
+        void Execute(object dataContext);
     }
 }
