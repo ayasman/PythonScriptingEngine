@@ -13,7 +13,7 @@ namespace ScriptingEngine
 {
     public abstract class ScriptingEngineBase : IScriptingEngine
     {
-        protected Dictionary<Type, Dictionary<string, object>> registeredScriptObjects = new Dictionary<Type, Dictionary<string, object>>();
+        protected Dictionary<string, object> registeredScriptObjects = new Dictionary<string, object>();
 
         public virtual void Initialize()
         {
@@ -26,19 +26,33 @@ namespace ScriptingEngine
         {
             if (newObject is IRegisterableScript)
             {
-                if (!registeredScriptObjects.ContainsKey(typeof(IRegisterableScript)))
-                    registeredScriptObjects.Add(typeof(IRegisterableScript), new Dictionary<string, object>());
-
-                registeredScriptObjects[typeof(IRegisterableScript)].Add(((IRegisterableScript)newObject).Name, newObject);
+                string key = ((IRegisterableScript)newObject).Name;
+                if (!registeredScriptObjects.ContainsKey(key))
+                    registeredScriptObjects.Add(key, newObject);
+                else
+                    registeredScriptObjects[key] = newObject;
             }
         }
 
-        public void ExecuteScript<T>(string name, object dataContext)
+        public void ExecuteScript(string name, object dataContext)
         {
+            if (registeredScriptObjects.ContainsKey(name))
+            {
+                var scriptObj = registeredScriptObjects[name];
+                if (scriptObj is IExecutableScript)
+                    ((IExecutableScript)scriptObj).Execute(dataContext);
+            }
+        }
 
-            var scriptObj = registeredScriptObjects[typeof(T)];
-            if (scriptObj is IRegisterableScript)
-                ((IRegisterableScript)scriptObj).Execute(dataContext);
+        public object ExecuteScript(string name)
+        {
+            if (registeredScriptObjects.ContainsKey(name))
+            {
+                var scriptObj = registeredScriptObjects[name];
+                if (scriptObj is IDataScript)
+                    return ((IDataScript)scriptObj).Data;
+            }
+            return null;
         }
 
         protected static IEnumerable<string> GetFiles(string path)

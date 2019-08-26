@@ -4,8 +4,8 @@ using System.Text;
 
 namespace ScriptingEngine
 {
-    public interface IRegisterableScript
+    public interface IDataScript : IRegisterableScript
     {
-        string Name { get; }
+        object Data { get; }
     }
 }

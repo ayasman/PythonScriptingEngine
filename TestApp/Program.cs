@@ -45,23 +45,29 @@ import System
 from System import String
 from System import Guid
 from ScriptingEngine import IRegisterableScript
+from ScriptingEngine import IDataScript
+from ScriptingEngine import IExecutableScript
 
-class Calculator(IRegisterableScript):
+class Calculator(IDataScript, IExecutableScript):
     def get_Name(self):
 	    return 'Test'
+    def get_Data(self):
+	    return Calculator()
     def Execute(this, dataContext):
         return
 
 ScriptingEngine.RegisterScript(Calculator())";
 
-            CSharpScriptingEngine v = new CSharpScriptingEngine();
-            v.Initialize();
-            v.LoadAndExecuteRegister(codeToCompile);
+            //CSharpScriptingEngine v = new CSharpScriptingEngine();
+            //v.Initialize();
+            //v.LoadAndExecuteRegister(codeToCompile);
 
             IronPythonScriptingEngine w = new IronPythonScriptingEngine();
             w.Initialize();
             w.LoadAndExecuteRegister(pythonCode);
-            
+            var retret = w.ExecuteScript("Test");
+            w.ExecuteScript("Test", null);
+
             //ScriptingEngine se = new ScriptingEngine();
             //se.Initialize();
             //se.LoadScripts(@"C:\Projects\Python Scripting Engine\PythonScriptingEngine\TestScripts\");

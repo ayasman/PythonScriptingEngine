@@ -4,8 +4,8 @@ using System.Text;
 
 namespace ScriptingEngine
 {
-    public interface IRegisterableScript
+    public interface IExecutableScript : IRegisterableScript
     {
-        string Name { get; }
+        void Execute(object dataContext);
     }
 }

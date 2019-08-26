@@ -8,6 +8,8 @@ namespace ScriptingEngine
     {
         void RegisterScript(object newObject);
 
-        void ExecuteScript<T>(string name, object dataContext);
+        void ExecuteScript(string name, object dataContext);
+
+        object ExecuteScript(string name);
     }
 }
