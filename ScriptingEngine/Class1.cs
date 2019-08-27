@@ -8,12 +8,18 @@ using System.Collections.Generic;
 using System.IO;
 using IronPython.Hosting;
 using Microsoft.Scripting.Hosting;
+using System.Reactive;
+using System.Reactive.Subjects;
+using System.Reactive.Linq;
 
 namespace ScriptingEngine
 {
     public abstract class ScriptingEngineBase : IScriptingEngine
     {
+        protected Subject<string> onRegisteredSubject = new Subject<string>();
         protected Dictionary<string, object> registeredScriptObjects = new Dictionary<string, object>();
+
+        public IObservable<string> WhenScriptRegistered => onRegisteredSubject.Publish().RefCount();
 
         public virtual void Initialize()
         {
@@ -31,6 +37,9 @@ namespace ScriptingEngine
                     registeredScriptObjects.Add(key, newObject);
                 else
                     registeredScriptObjects[key] = newObject;
+
+                ((IRegisterableScript)newObject).OnRegistered();
+                onRegisteredSubject.OnNext(key);
             }
         }
 
