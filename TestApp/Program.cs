@@ -15,13 +15,12 @@ namespace TestApp
             string codeToCompile = @"
             using System;
             using ScriptingEngine;
-            namespace RoslynCompileSample
-            {
-                public class Writer : IRegisterableScript
+
+                public class Writer : IExecutableScript
                 {
-                    public void Write(string message)
+                    public void OnRegistered()
                     {
-                        Console.WriteLine($""you said '{message}!'"");
+                        Console.WriteLine($""you said 'TRETRESTRSTRE!'"");
                     }
 
                     public string Name 
@@ -36,7 +35,7 @@ namespace TestApp
                     {
                     }
                 }
-            }";
+            ";
 
             string pythonCode = @"
 import clr
@@ -51,6 +50,8 @@ from ScriptingEngine import IExecutableScript
 class Calculator(IDataScript, IExecutableScript):
     def get_Name(self):
 	    return 'Test'
+    def OnRegistered(this):
+        return
     def get_Data(self):
 	    return Calculator()
     def Execute(this, dataContext):
@@ -58,9 +59,15 @@ class Calculator(IDataScript, IExecutableScript):
 
 ScriptingEngine.RegisterScript(Calculator())";
 
-            //CSharpScriptingEngine v = new CSharpScriptingEngine();
-            //v.Initialize();
-            //v.LoadAndExecuteRegister(codeToCompile);
+            CSharpScriptingEngine v = new CSharpScriptingEngine();
+            v.Initialize();
+            v.LoadAndExecuteRegister(codeToCompile);
+            v.ExecuteScript("Test", null);
+
+            CSScriptEngine css = new CSScriptEngine();
+            css.Initialize();
+            css.LoadAndExecuteRegister(codeToCompile);
+            css.ExecuteScript("Test", null);
 
             IronPythonScriptingEngine w = new IronPythonScriptingEngine();
             w.Initialize();
@@ -68,6 +75,8 @@ ScriptingEngine.RegisterScript(Calculator())";
             var retret = w.ExecuteScript("Test");
             w.ExecuteScript("Test", null);
 
+            dynamic fds = w.ScriptObject("Test");
+            var tttt = fds.get_Data();
             //ScriptingEngine se = new ScriptingEngine();
             //se.Initialize();
             //se.LoadScripts(@"C:\Projects\Python Scripting Engine\PythonScriptingEngine\TestScripts\");

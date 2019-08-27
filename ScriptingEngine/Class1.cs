@@ -11,24 +11,41 @@ using Microsoft.Scripting.Hosting;
 using System.Reactive;
 using System.Reactive.Subjects;
 using System.Reactive.Linq;
+using CSScriptLibrary;
 
 namespace ScriptingEngine
 {
     public abstract class ScriptingEngineBase : IScriptingEngine
     {
         protected Subject<string> onRegisteredSubject = new Subject<string>();
-        protected Dictionary<string, object> registeredScriptObjects = new Dictionary<string, object>();
+        protected Dictionary<string, dynamic> registeredScriptObjects = new Dictionary<string, dynamic>();
+        protected List<Assembly> registeredAssemblies = new List<Assembly>();
 
         public IObservable<string> WhenScriptRegistered => onRegisteredSubject.Publish().RefCount();
+
+        public ScriptingEngineBase()
+        {
+            
+        }
 
         public virtual void Initialize()
         {
             registeredScriptObjects.Clear();
+
+            AppDomain.CurrentDomain.GetAssemblies().Distinct().ToList().ForEach(asm => RegisterAssembly(asm));
+        }
+
+        protected List<Assembly> RegisteredAssemblies => registeredAssemblies;
+
+        public void RegisterAssembly(Assembly refAssembly)
+        {
+            if (!registeredAssemblies.Contains(refAssembly))
+                registeredAssemblies.Add(refAssembly);
         }
 
         public abstract void LoadScripts(string directory);
 
-        public virtual void RegisterScript(object newObject)
+        public virtual void RegisterScript(dynamic newObject)
         {
             if (newObject is IRegisterableScript)
             {
@@ -61,6 +78,13 @@ namespace ScriptingEngine
                 if (scriptObj is IDataScript)
                     return ((IDataScript)scriptObj).Data;
             }
+            return null;
+        }
+
+        public dynamic ScriptObject(string name)
+        {
+            if (registeredScriptObjects.ContainsKey(name))
+                return registeredScriptObjects[name];
             return null;
         }
 
@@ -100,28 +124,31 @@ namespace ScriptingEngine
                 }
             }
         }
+
+        protected void WatchDirectory(string path)
+        {
+            FileSystemWatcher dirWatcher = new FileSystemWatcher();
+
+            dirWatcher.EnableRaisingEvents = true;
+        }
     }
 
     public class CSharpScriptingEngine : ScriptingEngineBase
     {
-        private readonly MetadataReference[] references = null;
+        private MetadataReference[] references = null;
 
-        public CSharpScriptingEngine()
+        public CSharpScriptingEngine() :
+            base()
         {
-            var refPaths = new[] {
-                typeof(System.Object).GetTypeInfo().Assembly.Location,
-                typeof(Console).GetTypeInfo().Assembly.Location,
-                typeof(IScriptingEngine).GetTypeInfo().Assembly.Location,
-                Assembly.GetExecutingAssembly().Location,
-                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(typeof(System.Runtime.GCSettings).GetTypeInfo().Assembly.Location), "System.Runtime.dll")
-            };
-            references = refPaths.Select(r => MetadataReference.CreateFromFile(r)).ToArray();
+
         }
 
         public override void Initialize()
         {
             base.Initialize();
-            //throw new NotImplementedException();
+
+            foreach (var asm in RegisteredAssemblies)
+                references = RegisteredAssemblies.Select(r => MetadataReference.CreateFromFile(r.Location)).ToArray();
         }
 
         public override void LoadScripts(string directory)
@@ -130,7 +157,6 @@ namespace ScriptingEngine
             {
                 try
                 {
-                    //scriptRegistry.Add(file, pythonEngine.ExecuteFile(file, engineScope));
                     LoadAndExecuteRegister(File.ReadAllText(file));
                 }
                 catch (Exception ex)
@@ -186,10 +212,51 @@ namespace ScriptingEngine
         }
     }
 
+    public class CSScriptEngine : ScriptingEngineBase
+    {
+        public CSScriptEngine() :
+            base()
+        {
+
+        }
+
+        public override void Initialize()
+        {
+            base.Initialize();
+        }
+
+        public override void LoadScripts(string directory)
+        {
+            foreach (var file in GetFiles(directory))
+            {
+                try
+                {
+                    LoadAndExecuteRegister(File.ReadAllText(file));
+                }
+                catch (Exception ex)
+                {
+
+                }
+            }
+        }
+
+        public void LoadAndExecuteRegister(string scriptText)
+        {
+            dynamic newObject = CSScript.RoslynEvaluator.LoadCode(scriptText);
+            RegisterScript(newObject);
+        }
+    }
+
     public class IronPythonScriptingEngine : ScriptingEngineBase
     {
         private ScriptEngine pythonEngine;
         private ScriptScope engineScope;
+
+        public IronPythonScriptingEngine() :
+            base()
+        {
+
+        }
 
         public override void Initialize()
         {
@@ -199,7 +266,10 @@ namespace ScriptingEngine
             globalObjects.Add("ScriptingEngine", this);
 
             pythonEngine = Python.CreateEngine();
-            pythonEngine.Runtime.LoadAssembly(Assembly.GetExecutingAssembly());
+
+            foreach (var asm in RegisteredAssemblies)
+                pythonEngine.Runtime.LoadAssembly(asm);
+
             engineScope = pythonEngine.CreateScope(globalObjects);
         }
 
@@ -209,7 +279,6 @@ namespace ScriptingEngine
             {
                 try
                 {
-                    //scriptRegistry.Add(file, pythonEngine.ExecuteFile(file, engineScope));
                     pythonEngine.ExecuteFile(file, engineScope);
                 }
                 catch (Exception ex)
