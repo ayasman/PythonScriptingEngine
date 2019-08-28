@@ -15,11 +15,12 @@ using CSScriptLibrary;
 
 namespace ScriptingEngine
 {
-    public abstract class ScriptingEngineBase : IScriptingEngine
+    public abstract class ScriptingEngineBase : IScriptingEngine, IDisposable
     {
         protected Subject<string> onRegisteredSubject = new Subject<string>();
         protected Dictionary<string, dynamic> registeredScriptObjects = new Dictionary<string, dynamic>();
         protected List<Assembly> registeredAssemblies = new List<Assembly>();
+        private List<FileSystemWatcher> directoryWatchers = new List<FileSystemWatcher>();
 
         public IObservable<string> WhenScriptRegistered => onRegisteredSubject.Publish().RefCount();
 
@@ -125,12 +126,87 @@ namespace ScriptingEngine
             }
         }
 
-        protected void WatchDirectory(string path)
+        public void WatchDirectory(string path)
         {
             FileSystemWatcher dirWatcher = new FileSystemWatcher();
 
+            Observable
+                .FromEventPattern<FileSystemEventHandler, FileSystemEventArgs>(
+                    h => dirWatcher.Changed += h,
+                    h => dirWatcher.Changed -= h)
+                .Select(x => x.EventArgs)
+                .Subscribe(x =>
+                {
+
+                });
+
+            Observable
+                .FromEventPattern<FileSystemEventHandler, FileSystemEventArgs>(
+                    h => dirWatcher.Created += h,
+                    h => dirWatcher.Created -= h)
+                .Select(x => x.EventArgs)
+                .Subscribe(x =>
+                {
+
+                });
+
+            Observable
+                .FromEventPattern<FileSystemEventHandler, FileSystemEventArgs>(
+                    h => dirWatcher.Deleted += h,
+                    h => dirWatcher.Deleted -= h)
+                .Select(x => x.EventArgs)
+                .Subscribe(x =>
+                {
+
+                });
+
+            Observable
+                .FromEventPattern<RenamedEventHandler, RenamedEventArgs>(
+                    h => dirWatcher.Renamed += h,
+                    h => dirWatcher.Renamed -= h)
+                .Select(x => x.EventArgs)
+                .Subscribe(x =>
+                {
+
+                });
+
+            Observable
+                .FromEventPattern<ErrorEventHandler, ErrorEventArgs>(
+                    h => dirWatcher.Error += h,
+                    h => dirWatcher.Error -= h)
+                .Select(x => x.EventArgs)
+                .Subscribe(x =>
+                {
+
+                });
+
+            dirWatcher.Path = path;
             dirWatcher.EnableRaisingEvents = true;
+            
+            directoryWatchers.Add(dirWatcher);
         }
+
+        #region IDisposable Support
+        private bool disposedValue = false;
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposedValue)
+            {
+                if (disposing)
+                {
+                    directoryWatchers.ForEach(p => p.Dispose());
+                }
+
+                disposedValue = true;
+            }
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+        }
+        #endregion
     }
 
     public class CSharpScriptingEngine : ScriptingEngineBase

@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace TestApp
@@ -59,24 +60,38 @@ class Calculator(IDataScript, IExecutableScript):
 
 ScriptingEngine.RegisterScript(Calculator())";
 
-            CSharpScriptingEngine v = new CSharpScriptingEngine();
-            v.Initialize();
-            v.LoadAndExecuteRegister(codeToCompile);
-            v.ExecuteScript("Test", null);
+            Task.Run(() =>
+            {
+                CSharpScriptingEngine v = new CSharpScriptingEngine();
+                v.WatchDirectory(@"C:\Test");
+            });
+            
 
-            CSScriptEngine css = new CSScriptEngine();
-            css.Initialize();
-            css.LoadAndExecuteRegister(codeToCompile);
-            css.ExecuteScript("Test", null);
+            Thread.Sleep(60000);
 
-            IronPythonScriptingEngine w = new IronPythonScriptingEngine();
-            w.Initialize();
-            w.LoadAndExecuteRegister(pythonCode);
-            var retret = w.ExecuteScript("Test");
-            w.ExecuteScript("Test", null);
 
-            dynamic fds = w.ScriptObject("Test");
-            var tttt = fds.get_Data();
+            //CSharpScriptingEngine v = new CSharpScriptingEngine();
+            //v.Initialize();
+            //v.LoadAndExecuteRegister(codeToCompile);
+            //v.ExecuteScript("Test", null);
+
+            //CSScriptEngine css = new CSScriptEngine();
+            //css.Initialize();
+            //css.LoadAndExecuteRegister(codeToCompile);
+            //css.ExecuteScript("Test", null);
+
+            //IronPythonScriptingEngine w = new IronPythonScriptingEngine();
+            //w.Initialize();
+            //w.LoadAndExecuteRegister(pythonCode);
+            //var retret = w.ExecuteScript("Test");
+            //w.ExecuteScript("Test", null);
+
+            //dynamic fds = w.ScriptObject("Test");
+            //var tttt = fds.get_Data();
+
+
+
+
             //ScriptingEngine se = new ScriptingEngine();
             //se.Initialize();
             //se.LoadScripts(@"C:\Projects\Python Scripting Engine\PythonScriptingEngine\TestScripts\");
