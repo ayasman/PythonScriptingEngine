@@ -15,19 +15,22 @@ using CSScriptLibrary;
 
 namespace ScriptingEngine
 {
-    internal class ScriptData
+    public class ScriptData
     {
-
+        public string Name { get; set; }
+        public string FilePath { get; set; }
+        public dynamic ScriptObject { get; set; }
     }
 
     public abstract class ScriptingEngineBase : IScriptingEngine, IDisposable
     {
-        protected Subject<string> onRegisteredSubject = new Subject<string>();
+        protected Subject<IRegisterableScript> onRegisteredSubject = new Subject<IRegisterableScript>();
+
         protected Dictionary<string, dynamic> registeredScriptObjects = new Dictionary<string, dynamic>();
         protected List<Assembly> registeredAssemblies = new List<Assembly>();
         private List<FileSystemWatcher> directoryWatchers = new List<FileSystemWatcher>();
 
-        public IObservable<string> WhenScriptRegistered => onRegisteredSubject.Publish().RefCount();
+        public IObservable<IRegisterableScript> WhenScriptRegistered => onRegisteredSubject.Publish().RefCount();
 
         public ScriptingEngineBase()
         {
@@ -49,7 +52,22 @@ namespace ScriptingEngine
                 registeredAssemblies.Add(refAssembly);
         }
 
-        public abstract void LoadScripts(string directory);
+        public abstract void LoadScript(string file);
+
+        public void LoadScripts(string path)
+        {
+            foreach (var file in GetFiles(path))
+            {
+                try
+                {
+                    LoadScript(file);
+                }
+                catch (Exception ex)
+                {
+
+                }
+            }
+        }
 
         public virtual void RegisterScript(dynamic newObject)
         {
@@ -62,7 +80,7 @@ namespace ScriptingEngine
                     registeredScriptObjects[key] = newObject;
 
                 ((IRegisterableScript)newObject).OnRegistered();
-                onRegisteredSubject.OnNext(key);
+                onRegisteredSubject.OnNext(newObject);
             }
         }
 
@@ -214,129 +232,138 @@ namespace ScriptingEngine
         #endregion
     }
 
-    public class CSharpScriptingEngine : ScriptingEngineBase
-    {
-        private MetadataReference[] references = null;
+    //public class CSharpScriptingEngine : ScriptingEngineBase
+    //{
+    //    private MetadataReference[] references = null;
 
-        public CSharpScriptingEngine() :
-            base()
-        {
+    //    public CSharpScriptingEngine() :
+    //        base()
+    //    {
 
-        }
+    //    }
 
-        public override void Initialize()
-        {
-            base.Initialize();
+    //    public override void Initialize()
+    //    {
+    //        base.Initialize();
 
-            foreach (var asm in RegisteredAssemblies)
-                references = RegisteredAssemblies.Select(r => MetadataReference.CreateFromFile(r.Location)).ToArray();
-        }
+    //        foreach (var asm in RegisteredAssemblies)
+    //            references = RegisteredAssemblies.Select(r => MetadataReference.CreateFromFile(r.Location)).ToArray();
+    //    }
 
-        public override void LoadScripts(string directory)
-        {
-            foreach (var file in GetFiles(directory))
-            {
-                try
-                {
-                    LoadAndExecuteRegister(File.ReadAllText(file));
-                }
-                catch (Exception ex)
-                {
+    //    public override void LoadScripts(string path)
+    //    {
+    //        base.LoadScripts(path);
 
-                }
-            }
-        }
+    //        foreach (var file in GetFiles(path))
+    //        {
+    //            try
+    //            {
+    //                LoadAndExecuteRegister(File.ReadAllText(file));
+    //            }
+    //            catch (Exception ex)
+    //            {
 
-        public void LoadAndExecuteRegister(string scriptText)
-        {
-            SyntaxTree syntaxTree = CSharpSyntaxTree.ParseText(scriptText);
-            string assemblyName = System.IO.Path.GetRandomFileName();
+    //            }
+    //        }
+    //    }
 
-            CSharpCompilation compilation = CSharpCompilation.Create(
-                assemblyName,
-                syntaxTrees: new[] { syntaxTree },
-                references: references,
-                options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+    //    public void LoadAndExecuteRegister(string scriptText)
+    //    {
+    //        SyntaxTree syntaxTree = CSharpSyntaxTree.ParseText(scriptText);
+    //        string assemblyName = System.IO.Path.GetRandomFileName();
 
-            using (var ms = new System.IO.MemoryStream())
-            {
-                EmitResult result = compilation.Emit(ms);
+    //        CSharpCompilation compilation = CSharpCompilation.Create(
+    //            assemblyName,
+    //            syntaxTrees: new[] { syntaxTree },
+    //            references: references,
+    //            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-                if (!result.Success)
-                {
-                    System.Collections.Generic.IEnumerable<Diagnostic> failures = result.Diagnostics.Where(diagnostic =>
-                        diagnostic.IsWarningAsError ||
-                        diagnostic.Severity == DiagnosticSeverity.Error);
+    //        using (var ms = new System.IO.MemoryStream())
+    //        {
+    //            EmitResult result = compilation.Emit(ms);
 
-                    foreach (Diagnostic diagnostic in failures)
-                    {
-                        Console.Error.WriteLine("\t{0}: {1}", diagnostic.Id, diagnostic.GetMessage());
-                    }
-                }
-                else
-                {
-                    ms.Seek(0, System.IO.SeekOrigin.Begin);
-                    Assembly assembly = Assembly.Load(ms.ToArray());
+    //            if (!result.Success)
+    //            {
+    //                System.Collections.Generic.IEnumerable<Diagnostic> failures = result.Diagnostics.Where(diagnostic =>
+    //                    diagnostic.IsWarningAsError ||
+    //                    diagnostic.Severity == DiagnosticSeverity.Error);
 
-                    var type = typeof(IRegisterableScript);
-                    var types = assembly
-                        .GetTypes()
-                        .Where(p => type.IsAssignableFrom(p));
+    //                foreach (Diagnostic diagnostic in failures)
+    //                {
+    //                    Console.Error.WriteLine("\t{0}: {1}", diagnostic.Id, diagnostic.GetMessage());
+    //                }
+    //            }
+    //            else
+    //            {
+    //                ms.Seek(0, System.IO.SeekOrigin.Begin);
+    //                Assembly assembly = Assembly.Load(ms.ToArray());
 
-                    foreach (var t in types)
-                    {
-                        var instance = assembly.CreateInstance(t.FullName);
-                        RegisterScript(instance);
-                    }
-                }
-            }
-        }
-    }
+    //                var type = typeof(IRegisterableScript);
+    //                var types = assembly
+    //                    .GetTypes()
+    //                    .Where(p => type.IsAssignableFrom(p));
 
-    public class CSScriptEngine : ScriptingEngineBase
-    {
-        public CSScriptEngine() :
-            base()
-        {
+    //                foreach (var t in types)
+    //                {
+    //                    var instance = assembly.CreateInstance(t.FullName);
+    //                    RegisterScript(instance);
+    //                }
+    //            }
+    //        }
+    //    }
+    //}
 
-        }
+    //public class CSScriptEngine : ScriptingEngineBase
+    //{
+    //    public CSScriptEngine() :
+    //        base()
+    //    {
 
-        public override void Initialize()
-        {
-            base.Initialize();
-        }
+    //    }
 
-        public override void LoadScripts(string directory)
-        {
-            foreach (var file in GetFiles(directory))
-            {
-                try
-                {
-                    LoadAndExecuteRegister(File.ReadAllText(file));
-                }
-                catch (Exception ex)
-                {
+    //    public override void Initialize()
+    //    {
+    //        base.Initialize();
+    //    }
 
-                }
-            }
-        }
+    //    public override void LoadScripts(string path)
+    //    {
+    //        base.LoadScripts(path);
 
-        public void LoadAndExecuteRegister(string scriptText)
-        {
-            dynamic newObject = CSScript.RoslynEvaluator.LoadCode(scriptText);
-            RegisterScript(newObject);
-        }
-    }
+    //        foreach (var file in GetFiles(path))
+    //        {
+    //            try
+    //            {
+    //                LoadAndExecuteRegister(File.ReadAllText(file));
+    //            }
+    //            catch (Exception ex)
+    //            {
+
+    //            }
+    //        }
+    //    }
+
+    //    public void LoadAndExecuteRegister(string scriptText)
+    //    {
+    //        dynamic newObject = CSScript.RoslynEvaluator.LoadCode(scriptText);
+    //        RegisterScript(newObject);
+    //    }
+    //}
 
     public class IronPythonScriptingEngine : ScriptingEngineBase
     {
         private ScriptEngine pythonEngine;
         private ScriptScope engineScope;
 
+        private IRegisterableScript lastRegistered;
+
         public IronPythonScriptingEngine() :
             base()
         {
-
+            WhenScriptRegistered.Subscribe(obs =>
+            {
+                lastRegistered = obs;
+            });
         }
 
         public override void Initialize()
@@ -354,110 +381,117 @@ namespace ScriptingEngine
             engineScope = pythonEngine.CreateScope(globalObjects);
         }
 
-        public override void LoadScripts(string directory)
-        {
-            foreach (var file in GetFiles(directory))
-            {
-                try
-                {
-                    pythonEngine.ExecuteFile(file, engineScope);
-                }
-                catch (Exception ex)
-                {
+        //public override void LoadScripts(string path)
+        //{
+        //    base.LoadScripts(path);
 
-                }
-            }
-        }
+        //    foreach (var file in GetFiles(path))
+        //    {
+        //        try
+        //        {
+        //            pythonEngine.ExecuteFile(file, engineScope);
+        //        }
+        //        catch (Exception ex)
+        //        {
+
+        //        }
+        //    }
+        //}
 
         public void LoadAndExecuteRegister(string scriptText)
         {
             pythonEngine.Execute(scriptText, engineScope);
         }
-    }
 
-    public class Class1
-    {
-        public void Initialize()
+        public override void LoadScript(string file)
         {
-            string codeToCompile = @"
-            using System;
-            using ScriptingEngine;
-            namespace RoslynCompileSample
-            {
-                public class Writer : IRegisterableScript
-                {
-                    public void Write(string message)
-                    {
-                        Console.WriteLine($""you said '{message}!'"");
-                    }
-
-                    public string Name 
-                    { 
-                        get
-                        {
-                            return string.Empty;
-                        }
-                    }
-
-                    public void Execute()
-                    {
-                    }
-                }
-            }";
-
-            SyntaxTree syntaxTree = CSharpSyntaxTree.ParseText(codeToCompile);
-
-            string assemblyName = System.IO.Path.GetRandomFileName();
-            var refPaths = new[] {
-                typeof(System.Object).GetTypeInfo().Assembly.Location,
-                typeof(Console).GetTypeInfo().Assembly.Location,
-                typeof(IScriptingEngine).GetTypeInfo().Assembly.Location,
-                System.IO.Path.Combine(System.IO.Path.GetDirectoryName(typeof(System.Runtime.GCSettings).GetTypeInfo().Assembly.Location), "System.Runtime.dll")
-            };
-            MetadataReference[] references = refPaths.Select(r => MetadataReference.CreateFromFile(r)).ToArray();
-
-            CSharpCompilation compilation = CSharpCompilation.Create(
-                assemblyName,
-                syntaxTrees: new[] { syntaxTree },
-                references: references,
-                options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-
-            using (var ms = new System.IO.MemoryStream())
-            {
-                EmitResult result = compilation.Emit(ms);
-
-                if (!result.Success)
-                {
-                    System.Collections.Generic.IEnumerable<Diagnostic> failures = result.Diagnostics.Where(diagnostic =>
-                        diagnostic.IsWarningAsError ||
-                        diagnostic.Severity == DiagnosticSeverity.Error);
-
-                    foreach (Diagnostic diagnostic in failures)
-                    {
-                        Console.Error.WriteLine("\t{0}: {1}", diagnostic.Id, diagnostic.GetMessage());
-                    }
-                }
-                else
-                {
-                    ms.Seek(0, System.IO.SeekOrigin.Begin);
-                    Assembly assembly = Assembly.Load(ms.ToArray());
-
-                    var type = typeof(IRegisterableScript);
-                    var types = assembly
-                        .GetTypes()
-                        .Where(p => type.IsAssignableFrom(p));
-
-                    foreach (var t in types)
-                    {
-                        IRegisterableScript instance = assembly.CreateInstance(t.FullName) as IRegisterableScript;
-
-                    }
-                    //var type = assembly.GetType("RoslynCompileSample.Writer");
-                    //var instance = assembly.CreateInstance("RoslynCompileSample.Writer");
-                    //var meth = type.GetMember("Write").First() as MethodInfo;
-                    //meth.Invoke(instance, new[] { "joel" });
-                }
-            }
+            pythonEngine.ExecuteFile(file, engineScope);
         }
     }
+
+    //public class Class1
+    //{
+    //    public void Initialize()
+    //    {
+    //        string codeToCompile = @"
+    //        using System;
+    //        using ScriptingEngine;
+    //        namespace RoslynCompileSample
+    //        {
+    //            public class Writer : IRegisterableScript
+    //            {
+    //                public void Write(string message)
+    //                {
+    //                    Console.WriteLine($""you said '{message}!'"");
+    //                }
+
+    //                public string Name 
+    //                { 
+    //                    get
+    //                    {
+    //                        return string.Empty;
+    //                    }
+    //                }
+
+    //                public void Execute()
+    //                {
+    //                }
+    //            }
+    //        }";
+
+    //        SyntaxTree syntaxTree = CSharpSyntaxTree.ParseText(codeToCompile);
+
+    //        string assemblyName = System.IO.Path.GetRandomFileName();
+    //        var refPaths = new[] {
+    //            typeof(System.Object).GetTypeInfo().Assembly.Location,
+    //            typeof(Console).GetTypeInfo().Assembly.Location,
+    //            typeof(IScriptingEngine).GetTypeInfo().Assembly.Location,
+    //            System.IO.Path.Combine(System.IO.Path.GetDirectoryName(typeof(System.Runtime.GCSettings).GetTypeInfo().Assembly.Location), "System.Runtime.dll")
+    //        };
+    //        MetadataReference[] references = refPaths.Select(r => MetadataReference.CreateFromFile(r)).ToArray();
+
+    //        CSharpCompilation compilation = CSharpCompilation.Create(
+    //            assemblyName,
+    //            syntaxTrees: new[] { syntaxTree },
+    //            references: references,
+    //            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+    //        using (var ms = new System.IO.MemoryStream())
+    //        {
+    //            EmitResult result = compilation.Emit(ms);
+
+    //            if (!result.Success)
+    //            {
+    //                System.Collections.Generic.IEnumerable<Diagnostic> failures = result.Diagnostics.Where(diagnostic =>
+    //                    diagnostic.IsWarningAsError ||
+    //                    diagnostic.Severity == DiagnosticSeverity.Error);
+
+    //                foreach (Diagnostic diagnostic in failures)
+    //                {
+    //                    Console.Error.WriteLine("\t{0}: {1}", diagnostic.Id, diagnostic.GetMessage());
+    //                }
+    //            }
+    //            else
+    //            {
+    //                ms.Seek(0, System.IO.SeekOrigin.Begin);
+    //                Assembly assembly = Assembly.Load(ms.ToArray());
+
+    //                var type = typeof(IRegisterableScript);
+    //                var types = assembly
+    //                    .GetTypes()
+    //                    .Where(p => type.IsAssignableFrom(p));
+
+    //                foreach (var t in types)
+    //                {
+    //                    IRegisterableScript instance = assembly.CreateInstance(t.FullName) as IRegisterableScript;
+
+    //                }
+    //                //var type = assembly.GetType("RoslynCompileSample.Writer");
+    //                //var instance = assembly.CreateInstance("RoslynCompileSample.Writer");
+    //                //var meth = type.GetMember("Write").First() as MethodInfo;
+    //                //meth.Invoke(instance, new[] { "joel" });
+    //            }
+    //        }
+    //    }
+    //}
 }

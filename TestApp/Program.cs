@@ -60,14 +60,14 @@ class Calculator(IDataScript, IExecutableScript):
 
 ScriptingEngine.RegisterScript(Calculator())";
 
-            Task.Run(() =>
-            {
-                CSharpScriptingEngine v = new CSharpScriptingEngine();
-                v.WatchDirectory(@"C:\Test");
-            });
-            
+            //Task.Run(() =>
+            //{
+            //    CSharpScriptingEngine v = new CSharpScriptingEngine();
+            //    v.WatchDirectory(@"C:\Test");
+            //});
 
-            Thread.Sleep(60000);
+
+            //Thread.Sleep(60000);
 
 
             //CSharpScriptingEngine v = new CSharpScriptingEngine();
@@ -80,9 +80,9 @@ ScriptingEngine.RegisterScript(Calculator())";
             //css.LoadAndExecuteRegister(codeToCompile);
             //css.ExecuteScript("Test", null);
 
-            //IronPythonScriptingEngine w = new IronPythonScriptingEngine();
-            //w.Initialize();
-            //w.LoadAndExecuteRegister(pythonCode);
+            IronPythonScriptingEngine w = new IronPythonScriptingEngine();
+            w.Initialize();
+            w.LoadAndExecuteRegister(pythonCode);
             //var retret = w.ExecuteScript("Test");
             //w.ExecuteScript("Test", null);
 
