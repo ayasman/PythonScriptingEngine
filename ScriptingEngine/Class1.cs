@@ -15,6 +15,11 @@ using CSScriptLibrary;
 
 namespace ScriptingEngine
 {
+    internal class ScriptData
+    {
+
+    }
+
     public abstract class ScriptingEngineBase : IScriptingEngine, IDisposable
     {
         protected Subject<string> onRegisteredSubject = new Subject<string>();
