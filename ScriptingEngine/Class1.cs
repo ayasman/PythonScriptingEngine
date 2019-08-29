@@ -24,13 +24,13 @@ namespace ScriptingEngine
 
     public abstract class ScriptingEngineBase : IScriptingEngine, IDisposable
     {
-        protected Subject<IRegisterableScript> onRegisteredSubject = new Subject<IRegisterableScript>();
+        protected Subject<ScriptData> onRegisteredSubject = new Subject<ScriptData>();
 
-        protected Dictionary<string, dynamic> registeredScriptObjects = new Dictionary<string, dynamic>();
+        protected Dictionary<string, ScriptData> registeredScriptObjects = new Dictionary<string, ScriptData>();
         protected List<Assembly> registeredAssemblies = new List<Assembly>();
         private List<FileSystemWatcher> directoryWatchers = new List<FileSystemWatcher>();
 
-        public IObservable<IRegisterableScript> WhenScriptRegistered => onRegisteredSubject.Publish().RefCount();
+        public IObservable<ScriptData> WhenScriptRegistered => onRegisteredSubject.Publish().RefCount();
 
         public ScriptingEngineBase()
         {
@@ -74,13 +74,16 @@ namespace ScriptingEngine
             if (newObject is IRegisterableScript)
             {
                 string key = ((IRegisterableScript)newObject).Name;
+                var newScriptData = new ScriptData() { Name = key, ScriptObject = newObject };
+                
                 if (!registeredScriptObjects.ContainsKey(key))
-                    registeredScriptObjects.Add(key, newObject);
+                    registeredScriptObjects.Add(key, newScriptData);
                 else
-                    registeredScriptObjects[key] = newObject;
+                    registeredScriptObjects[key] = newScriptData;
 
                 ((IRegisterableScript)newObject).OnRegistered();
-                onRegisteredSubject.OnNext(newObject);
+
+                onRegisteredSubject.OnNext(newScriptData);
             }
         }
 
@@ -89,8 +92,8 @@ namespace ScriptingEngine
             if (registeredScriptObjects.ContainsKey(name))
             {
                 var scriptObj = registeredScriptObjects[name];
-                if (scriptObj is IExecutableScript)
-                    ((IExecutableScript)scriptObj).Execute(dataContext);
+                if (scriptObj.ScriptObject is IExecutableScript)
+                    ((IExecutableScript)scriptObj.ScriptObject).Execute(dataContext);
             }
         }
 
@@ -99,8 +102,8 @@ namespace ScriptingEngine
             if (registeredScriptObjects.ContainsKey(name))
             {
                 var scriptObj = registeredScriptObjects[name];
-                if (scriptObj is IDataScript)
-                    return ((IDataScript)scriptObj).Data;
+                if (scriptObj.ScriptObject is IDataScript)
+                    return ((IDataScript)scriptObj.ScriptObject).Data;
             }
             return null;
         }
@@ -108,7 +111,7 @@ namespace ScriptingEngine
         public dynamic ScriptObject(string name)
         {
             if (registeredScriptObjects.ContainsKey(name))
-                return registeredScriptObjects[name];
+                return registeredScriptObjects[name].ScriptObject;
             return null;
         }
 
@@ -355,7 +358,7 @@ namespace ScriptingEngine
         private ScriptEngine pythonEngine;
         private ScriptScope engineScope;
 
-        private IRegisterableScript lastRegistered;
+        private ScriptData lastRegistered;
 
         public IronPythonScriptingEngine() :
             base()
@@ -406,6 +409,8 @@ namespace ScriptingEngine
         public override void LoadScript(string file)
         {
             pythonEngine.ExecuteFile(file, engineScope);
+
+            lastRegistered.FilePath = file;
         }
     }
 
