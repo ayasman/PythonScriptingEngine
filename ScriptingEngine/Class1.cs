@@ -25,6 +25,8 @@ namespace ScriptingEngine
     public abstract class ScriptingEngineBase : IScriptingEngine, IDisposable
     {
         protected Subject<ScriptData> onRegisteredSubject = new Subject<ScriptData>();
+        protected Subject<string> onDeletedSubject = new Subject<string>();
+        protected Subject<string> onChangedSubject = new Subject<string>();
 
         protected Dictionary<string, ScriptData> registeredScriptObjects = new Dictionary<string, ScriptData>();
         protected List<Assembly> registeredAssemblies = new List<Assembly>();
@@ -67,6 +69,8 @@ namespace ScriptingEngine
 
                 }
             }
+
+            WatchDirectory(path);
         }
 
         public virtual void RegisterScript(dynamic newObject)
@@ -163,7 +167,14 @@ namespace ScriptingEngine
                 .Select(x => x.EventArgs)
                 .Subscribe(x =>
                 {
+                    var oldName = registeredScriptObjects.Select(p => p.Value).FirstOrDefault(p => p.FilePath == x.FullPath)?.Name;
+                    LoadScript(x.FullPath);
 
+                    if (registeredScriptObjects.Count(p => p.Value.FilePath == x.FullPath) > 1)
+                    {
+                        registeredScriptObjects.Remove(oldName);
+                        onDeletedSubject.OnNext(oldName);
+                    }
                 });
 
             Observable
@@ -173,7 +184,7 @@ namespace ScriptingEngine
                 .Select(x => x.EventArgs)
                 .Subscribe(x =>
                 {
-
+                    LoadScript(x.FullPath);
                 });
 
             Observable
@@ -183,7 +194,9 @@ namespace ScriptingEngine
                 .Select(x => x.EventArgs)
                 .Subscribe(x =>
                 {
-
+                    var scriptName = registeredScriptObjects.Select(p => p.Value).FirstOrDefault(p => p.FilePath == x.FullPath).Name;
+                    registeredScriptObjects.Remove(scriptName);
+                    onDeletedSubject.OnNext(scriptName);
                 });
 
             Observable
@@ -193,7 +206,7 @@ namespace ScriptingEngine
                 .Select(x => x.EventArgs)
                 .Subscribe(x =>
                 {
-
+                    registeredScriptObjects.Select(p => p.Value).FirstOrDefault(p => p.FilePath == x.OldFullPath).FilePath = x.FullPath;
                 });
 
             Observable
@@ -383,23 +396,6 @@ namespace ScriptingEngine
 
             engineScope = pythonEngine.CreateScope(globalObjects);
         }
-
-        //public override void LoadScripts(string path)
-        //{
-        //    base.LoadScripts(path);
-
-        //    foreach (var file in GetFiles(path))
-        //    {
-        //        try
-        //        {
-        //            pythonEngine.ExecuteFile(file, engineScope);
-        //        }
-        //        catch (Exception ex)
-        //        {
-
-        //        }
-        //    }
-        //}
 
         public void LoadAndExecuteRegister(string scriptText)
         {
