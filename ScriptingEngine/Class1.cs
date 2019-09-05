@@ -14,6 +14,7 @@ namespace ScriptingEngine
     public class ScriptData
     {
         public string Name { get; set; }
+        public string Type { get; set; }
         public string FilePath { get; set; }
         public dynamic ScriptObject { get; set; }
     }
@@ -28,6 +29,8 @@ namespace ScriptingEngine
         protected Subject<string> onChangedSubject = new Subject<string>();
 
         protected Dictionary<string, ScriptData> registeredScriptObjects = new Dictionary<string, ScriptData>();
+        protected Dictionary<string, List<string>> registedScriptTypes = new Dictionary<string, List<string>>();
+
         protected List<Assembly> registeredAssemblies = new List<Assembly>();
         private List<FileSystemWatcher> directoryWatchers = new List<FileSystemWatcher>();
 
@@ -36,6 +39,15 @@ namespace ScriptingEngine
         public IObservable<string> WhenScriptDeleted => onDeletedSubject.Publish().RefCount();
 
         public IObservable<string> WhenScriptChanged => onChangedSubject.Publish().RefCount();
+
+        public List<string> ScriptsOfType(string type) {
+            lock (registeredLocker)
+            {
+                if (registedScriptTypes.ContainsKey(type))
+                    return registedScriptTypes[type].ToList();
+            }
+            return new List<string>();
+        }
 
         public ScriptingEngineBase()
         {
@@ -46,6 +58,7 @@ namespace ScriptingEngine
             lock (registeredLocker)
             {
                 registeredScriptObjects.Clear();
+                registedScriptTypes.Clear();
             }
 
             AppDomain.CurrentDomain.GetAssemblies().Distinct().ToList().ForEach(asm => RegisterAssembly(asm));
@@ -81,25 +94,31 @@ namespace ScriptingEngine
         {
             if (newObject is IRegisterableScript)
             {
-                string key = ((IRegisterableScript)newObject).Name;
-                var newScriptData = new ScriptData() { Name = key, ScriptObject = newObject };
+                string nameKey = ((IRegisterableScript)newObject).Name;
+                string typeKey = ((IRegisterableScript)newObject).Type;
+                var newScriptData = new ScriptData() { Name = nameKey, Type = typeKey, ScriptObject = newObject };
                 bool wasNew = false;
 
                 lock (registeredLocker)
                 {
-                    if (!registeredScriptObjects.ContainsKey(key))
+                    if (!registeredScriptObjects.ContainsKey(nameKey))
                     {
                         wasNew = true;
-                        registeredScriptObjects.Add(key, newScriptData);
+                        registeredScriptObjects.Add(nameKey, newScriptData);
                     }
                     else
-                        registeredScriptObjects[key] = newScriptData;
+                        registeredScriptObjects[nameKey] = newScriptData;
+
+                    if (!registedScriptTypes.ContainsKey(typeKey))
+                        registedScriptTypes.Add(typeKey, new List<string>());
+                    if (!registedScriptTypes[typeKey].Contains(nameKey))
+                        registedScriptTypes[typeKey].Add(nameKey);
                 }
 
                 ((IRegisterableScript)newObject).OnRegistered();
 
                 if (!wasNew)
-                    onChangedSubject.OnNext(key);
+                    onChangedSubject.OnNext(nameKey);
                 onRegisteredSubject.OnNext(newScriptData);
             }
         }
@@ -189,16 +208,30 @@ namespace ScriptingEngine
                 .Select(x => x.EventArgs)
                 .Subscribe(x =>
                 {
-                    lock (registeredLocker)
+                    try
                     {
-                        var oldName = registeredScriptObjects.Select(p => p.Value).FirstOrDefault(p => p.FilePath == x.FullPath)?.Name;
-                        LoadScript(x.FullPath);
-
-                        if (registeredScriptObjects.Count(p => p.Value.FilePath == x.FullPath) > 1)
+                        lock (registeredLocker)
                         {
-                            registeredScriptObjects.Remove(oldName);
-                            onDeletedSubject.OnNext(oldName);
+                            var oldRegistration = registeredScriptObjects.Select(p => p.Value).FirstOrDefault(p => p.FilePath == x.FullPath);
+                            var oldName = oldRegistration?.Name;
+
+                            LoadScript(x.FullPath);
+
+                            if (registeredScriptObjects.Count(p => p.Value.FilePath == x.FullPath) > 1)
+                            {
+                                registedScriptTypes[oldRegistration?.Type].Remove(oldName);
+                                registeredScriptObjects.Remove(oldName);
+                                onDeletedSubject.OnNext(oldName);
+                            }
+
+                            var newRegistration = registeredScriptObjects.Select(p => p.Value).FirstOrDefault(p => p.FilePath == x.FullPath);
+                            if (newRegistration.Type != oldRegistration?.Type)
+                                registedScriptTypes[oldRegistration?.Type].Remove(oldName);
                         }
+                    }
+                    catch(Exception ex)
+                    {
+
                     }
                 })
             );
@@ -223,7 +256,11 @@ namespace ScriptingEngine
                 {
                     lock (registeredLocker)
                     {
-                        var scriptName = registeredScriptObjects.Select(p => p.Value).FirstOrDefault(p => p.FilePath == x.FullPath).Name;
+                        var registration = registeredScriptObjects.Select(p => p.Value).FirstOrDefault(p => p.FilePath == x.FullPath);
+                        var scriptName = registration.Name;
+                        var scriptType = registration.Type;
+
+                        registedScriptTypes[scriptType].Remove(scriptName);
                         registeredScriptObjects.Remove(scriptName);
                         onDeletedSubject.OnNext(scriptName);
                     }

@@ -4,6 +4,8 @@
     {
         string Name { get; }
 
+        string Type { get; }
+
         void OnRegistered();
     }
 }

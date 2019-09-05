@@ -51,6 +51,8 @@ from ScriptingEngine import IExecutableScript
 class Calculator(IDataScript, IExecutableScript):
     def get_Name(self):
 	    return 'Test'
+    def get_Type(self):
+	    return 'AI Tester'
     def OnRegistered(this):
         return
     def get_Data(self):
@@ -59,6 +61,7 @@ class Calculator(IDataScript, IExecutableScript):
         return
 
 ScriptingEngine.RegisterScript(Calculator())";
+
             IronPythonScriptingEngine v = new IronPythonScriptingEngine();
 
             Task.Run(() =>
@@ -69,14 +72,14 @@ ScriptingEngine.RegisterScript(Calculator())";
             });
 
 
-            Thread.Sleep(10000);
+            Thread.Sleep(240000);
 
-            Task.Run(() =>
-            {
-                v.Dispose();
-            });
+            //Task.Run(() =>
+            //{
+            //    v.Dispose();
+            //});
 
-            Thread.Sleep(60000);
+            //Thread.Sleep(60000);
 
             //CSharpScriptingEngine v = new CSharpScriptingEngine();
             //v.Initialize();
