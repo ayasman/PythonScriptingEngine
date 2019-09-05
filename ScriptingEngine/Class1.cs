@@ -1,17 +1,13 @@
-﻿using System;
-using System.Reflection;
+﻿using IronPython.Hosting;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.Emit;
-using System.Linq;
+using Microsoft.Scripting.Hosting;
+using System;
 using System.Collections.Generic;
 using System.IO;
-using IronPython.Hosting;
-using Microsoft.Scripting.Hosting;
-using System.Reactive;
-using System.Reactive.Subjects;
+using System.Linq;
 using System.Reactive.Linq;
-using CSScriptLibrary;
+using System.Reactive.Subjects;
+using System.Reflection;
 
 namespace ScriptingEngine
 {
@@ -24,6 +20,9 @@ namespace ScriptingEngine
 
     public abstract class ScriptingEngineBase : IScriptingEngine, IDisposable
     {
+        protected readonly object registeredLocker = new object();
+        private List<IDisposable> watcherDisposables = new List<IDisposable>();
+
         protected Subject<ScriptData> onRegisteredSubject = new Subject<ScriptData>();
         protected Subject<string> onDeletedSubject = new Subject<string>();
         protected Subject<string> onChangedSubject = new Subject<string>();
@@ -34,14 +33,20 @@ namespace ScriptingEngine
 
         public IObservable<ScriptData> WhenScriptRegistered => onRegisteredSubject.Publish().RefCount();
 
+        public IObservable<string> WhenScriptDeleted => onDeletedSubject.Publish().RefCount();
+
+        public IObservable<string> WhenScriptChanged => onChangedSubject.Publish().RefCount();
+
         public ScriptingEngineBase()
         {
-            
         }
 
         public virtual void Initialize()
         {
-            registeredScriptObjects.Clear();
+            lock (registeredLocker)
+            {
+                registeredScriptObjects.Clear();
+            }
 
             AppDomain.CurrentDomain.GetAssemblies().Distinct().ToList().ForEach(asm => RegisterAssembly(asm));
         }
@@ -66,7 +71,6 @@ namespace ScriptingEngine
                 }
                 catch (Exception ex)
                 {
-
                 }
             }
 
@@ -79,43 +83,61 @@ namespace ScriptingEngine
             {
                 string key = ((IRegisterableScript)newObject).Name;
                 var newScriptData = new ScriptData() { Name = key, ScriptObject = newObject };
-                
-                if (!registeredScriptObjects.ContainsKey(key))
-                    registeredScriptObjects.Add(key, newScriptData);
-                else
-                    registeredScriptObjects[key] = newScriptData;
+                bool wasNew = false;
+
+                lock (registeredLocker)
+                {
+                    if (!registeredScriptObjects.ContainsKey(key))
+                    {
+                        wasNew = true;
+                        registeredScriptObjects.Add(key, newScriptData);
+                    }
+                    else
+                        registeredScriptObjects[key] = newScriptData;
+                }
 
                 ((IRegisterableScript)newObject).OnRegistered();
 
+                if (!wasNew)
+                    onChangedSubject.OnNext(key);
                 onRegisteredSubject.OnNext(newScriptData);
             }
         }
 
         public void ExecuteScript(string name, object dataContext)
         {
-            if (registeredScriptObjects.ContainsKey(name))
+            lock (registeredLocker)
             {
-                var scriptObj = registeredScriptObjects[name];
-                if (scriptObj.ScriptObject is IExecutableScript)
-                    ((IExecutableScript)scriptObj.ScriptObject).Execute(dataContext);
+                if (registeredScriptObjects.ContainsKey(name))
+                {
+                    var scriptObj = registeredScriptObjects[name];
+                    if (scriptObj.ScriptObject is IExecutableScript)
+                        ((IExecutableScript)scriptObj.ScriptObject).Execute(dataContext);
+                }
             }
         }
 
         public object ExecuteScript(string name)
         {
-            if (registeredScriptObjects.ContainsKey(name))
+            lock (registeredLocker)
             {
-                var scriptObj = registeredScriptObjects[name];
-                if (scriptObj.ScriptObject is IDataScript)
-                    return ((IDataScript)scriptObj.ScriptObject).Data;
+                if (registeredScriptObjects.ContainsKey(name))
+                {
+                    var scriptObj = registeredScriptObjects[name];
+                    if (scriptObj.ScriptObject is IDataScript)
+                        return ((IDataScript)scriptObj.ScriptObject).Data;
+                }
             }
             return null;
         }
 
-        public dynamic ScriptObject(string name)
+        public ScriptData ScriptObject(string name)
         {
-            if (registeredScriptObjects.ContainsKey(name))
-                return registeredScriptObjects[name].ScriptObject;
+            lock (registeredLocker)
+            {
+                if (registeredScriptObjects.ContainsKey(name))
+                    return registeredScriptObjects[name];
+            }
             return null;
         }
 
@@ -156,28 +178,32 @@ namespace ScriptingEngine
             }
         }
 
-        public void WatchDirectory(string path)
+        private void WatchDirectory(string path)
         {
             FileSystemWatcher dirWatcher = new FileSystemWatcher();
 
-            Observable
+            watcherDisposables.Add(Observable
                 .FromEventPattern<FileSystemEventHandler, FileSystemEventArgs>(
                     h => dirWatcher.Changed += h,
                     h => dirWatcher.Changed -= h)
                 .Select(x => x.EventArgs)
                 .Subscribe(x =>
                 {
-                    var oldName = registeredScriptObjects.Select(p => p.Value).FirstOrDefault(p => p.FilePath == x.FullPath)?.Name;
-                    LoadScript(x.FullPath);
-
-                    if (registeredScriptObjects.Count(p => p.Value.FilePath == x.FullPath) > 1)
+                    lock (registeredLocker)
                     {
-                        registeredScriptObjects.Remove(oldName);
-                        onDeletedSubject.OnNext(oldName);
-                    }
-                });
+                        var oldName = registeredScriptObjects.Select(p => p.Value).FirstOrDefault(p => p.FilePath == x.FullPath)?.Name;
+                        LoadScript(x.FullPath);
 
-            Observable
+                        if (registeredScriptObjects.Count(p => p.Value.FilePath == x.FullPath) > 1)
+                        {
+                            registeredScriptObjects.Remove(oldName);
+                            onDeletedSubject.OnNext(oldName);
+                        }
+                    }
+                })
+            );
+
+            watcherDisposables.Add(Observable
                 .FromEventPattern<FileSystemEventHandler, FileSystemEventArgs>(
                     h => dirWatcher.Created += h,
                     h => dirWatcher.Created -= h)
@@ -185,48 +211,58 @@ namespace ScriptingEngine
                 .Subscribe(x =>
                 {
                     LoadScript(x.FullPath);
-                });
+                })
+            );
 
-            Observable
+            watcherDisposables.Add(Observable
                 .FromEventPattern<FileSystemEventHandler, FileSystemEventArgs>(
                     h => dirWatcher.Deleted += h,
                     h => dirWatcher.Deleted -= h)
                 .Select(x => x.EventArgs)
                 .Subscribe(x =>
                 {
-                    var scriptName = registeredScriptObjects.Select(p => p.Value).FirstOrDefault(p => p.FilePath == x.FullPath).Name;
-                    registeredScriptObjects.Remove(scriptName);
-                    onDeletedSubject.OnNext(scriptName);
-                });
+                    lock (registeredLocker)
+                    {
+                        var scriptName = registeredScriptObjects.Select(p => p.Value).FirstOrDefault(p => p.FilePath == x.FullPath).Name;
+                        registeredScriptObjects.Remove(scriptName);
+                        onDeletedSubject.OnNext(scriptName);
+                    }
+                })
+            );
 
-            Observable
+            watcherDisposables.Add(Observable
                 .FromEventPattern<RenamedEventHandler, RenamedEventArgs>(
                     h => dirWatcher.Renamed += h,
                     h => dirWatcher.Renamed -= h)
                 .Select(x => x.EventArgs)
                 .Subscribe(x =>
                 {
-                    registeredScriptObjects.Select(p => p.Value).FirstOrDefault(p => p.FilePath == x.OldFullPath).FilePath = x.FullPath;
-                });
+                    lock (registeredLocker)
+                    {
+                        registeredScriptObjects.Select(p => p.Value).FirstOrDefault(p => p.FilePath == x.OldFullPath).FilePath = x.FullPath;
+                    }
+                })
+            );
 
-            Observable
+            watcherDisposables.Add(Observable
                 .FromEventPattern<ErrorEventHandler, ErrorEventArgs>(
                     h => dirWatcher.Error += h,
                     h => dirWatcher.Error -= h)
                 .Select(x => x.EventArgs)
                 .Subscribe(x =>
                 {
-
-                });
+                })
+            );
 
             dirWatcher.Path = path;
             dirWatcher.EnableRaisingEvents = true;
-            
+
             directoryWatchers.Add(dirWatcher);
         }
 
         #region IDisposable Support
-        private bool disposedValue = false;
+
+        protected bool disposedValue = false;
 
         protected virtual void Dispose(bool disposing)
         {
@@ -234,6 +270,7 @@ namespace ScriptingEngine
             {
                 if (disposing)
                 {
+                    watcherDisposables.ForEach(p => p.Dispose());
                     directoryWatchers.ForEach(p => p.Dispose());
                 }
 
@@ -245,7 +282,8 @@ namespace ScriptingEngine
         {
             Dispose(true);
         }
-        #endregion
+
+        #endregion IDisposable Support
     }
 
     //public class CSharpScriptingEngine : ScriptingEngineBase
@@ -255,7 +293,6 @@ namespace ScriptingEngine
     //    public CSharpScriptingEngine() :
     //        base()
     //    {
-
     //    }
 
     //    public override void Initialize()
@@ -278,7 +315,6 @@ namespace ScriptingEngine
     //            }
     //            catch (Exception ex)
     //            {
-
     //            }
     //        }
     //    }
@@ -334,7 +370,6 @@ namespace ScriptingEngine
     //    public CSScriptEngine() :
     //        base()
     //    {
-
     //    }
 
     //    public override void Initialize()
@@ -354,7 +389,6 @@ namespace ScriptingEngine
     //            }
     //            catch (Exception ex)
     //            {
-
     //            }
     //        }
     //    }
@@ -365,50 +399,6 @@ namespace ScriptingEngine
     //        RegisterScript(newObject);
     //    }
     //}
-
-    public class IronPythonScriptingEngine : ScriptingEngineBase
-    {
-        private ScriptEngine pythonEngine;
-        private ScriptScope engineScope;
-
-        private ScriptData lastRegistered;
-
-        public IronPythonScriptingEngine() :
-            base()
-        {
-            WhenScriptRegistered.Subscribe(obs =>
-            {
-                lastRegistered = obs;
-            });
-        }
-
-        public override void Initialize()
-        {
-            base.Initialize();
-
-            Dictionary<string, object> globalObjects = new Dictionary<string, object>();
-            globalObjects.Add("ScriptingEngine", this);
-
-            pythonEngine = Python.CreateEngine();
-
-            foreach (var asm in RegisteredAssemblies)
-                pythonEngine.Runtime.LoadAssembly(asm);
-
-            engineScope = pythonEngine.CreateScope(globalObjects);
-        }
-
-        public void LoadAndExecuteRegister(string scriptText)
-        {
-            pythonEngine.Execute(scriptText, engineScope);
-        }
-
-        public override void LoadScript(string file)
-        {
-            pythonEngine.ExecuteFile(file, engineScope);
-
-            lastRegistered.FilePath = file;
-        }
-    }
 
     //public class Class1
     //{
@@ -426,8 +416,8 @@ namespace ScriptingEngine
     //                    Console.WriteLine($""you said '{message}!'"");
     //                }
 
-    //                public string Name 
-    //                { 
+    //                public string Name
+    //                {
     //                    get
     //                    {
     //                        return string.Empty;

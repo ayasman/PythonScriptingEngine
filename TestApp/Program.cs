@@ -59,17 +59,24 @@ class Calculator(IDataScript, IExecutableScript):
         return
 
 ScriptingEngine.RegisterScript(Calculator())";
+            IronPythonScriptingEngine v = new IronPythonScriptingEngine();
 
             Task.Run(() =>
             {
-                IronPythonScriptingEngine v = new IronPythonScriptingEngine();
                 v.Initialize();
-                v.WatchDirectory(@"C:\Test");
+                v.LoadScripts(@"C:\Test");
+                //v.WatchDirectory(@"C:\Test");
             });
 
 
-            Thread.Sleep(120000);
+            Thread.Sleep(10000);
 
+            Task.Run(() =>
+            {
+                v.Dispose();
+            });
+
+            Thread.Sleep(60000);
 
             //CSharpScriptingEngine v = new CSharpScriptingEngine();
             //v.Initialize();
