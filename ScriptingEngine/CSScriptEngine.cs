@@ -1,18 +1,14 @@
-﻿using IronPython.Hosting;
-using Microsoft.Scripting.Hosting;
+﻿using CSScriptLibrary;
 using System;
-using System.Collections.Generic;
 
 namespace ScriptingEngine
 {
-    public class IronPythonScriptingEngine : ScriptingEngineBase
+    public class CSScriptEngine : ScriptingEngineBase
     {
-        private ScriptScope engineScope;
         private string lastFile;
         private ScriptData lastRegistered;
-        private ScriptEngine pythonEngine;
 
-        public IronPythonScriptingEngine() :
+        public CSScriptEngine() :
             base()
         {
             lastRegistered = null;
@@ -21,38 +17,18 @@ namespace ScriptingEngine
 
         public override bool Initialize()
         {
-            try
-            {
-                base.Initialize();
-
-                Dictionary<string, object> globalObjects = new Dictionary<string, object>();
-                globalObjects.Add("ScriptingEngine", this);
-
-                pythonEngine = Python.CreateEngine();
-
-                foreach (var asm in RegisteredAssemblies)
-                    pythonEngine.Runtime.LoadAssembly(asm);
-
-                engineScope = pythonEngine.CreateScope(globalObjects);
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                onError.OnNext(ex);
-            }
-            return false;
+            return base.Initialize();
         }
 
         public bool LoadAndExecuteRegister(string scriptText)
         {
             try
             {
-                lastFile = null;
-                pythonEngine.Execute(scriptText, engineScope);
+                dynamic newObject = CSScript.RoslynEvaluator.LoadCode(scriptText);
+                RegisterScript(newObject);
 
                 if (lastRegistered == null)
-                    throw new ApplicationException("Python script does not register an object with the engine.");
+                    throw new ApplicationException("C# script does not register an object with the engine.");
                 lastRegistered = null;
 
                 return true;
@@ -68,10 +44,11 @@ namespace ScriptingEngine
         public override void LoadScript(string file)
         {
             lastFile = file;
-            pythonEngine.ExecuteFile(file, engineScope);
+            dynamic newObject = CSScript.RoslynEvaluator.LoadFile(file);
+            RegisterScript(newObject);
 
             if (lastRegistered == null)
-                throw new ApplicationException("Python script does not register an object with the engine.");
+                throw new ApplicationException("C# script does not register an object with the engine.");
             lastRegistered = null;
         }
 

@@ -28,7 +28,81 @@ namespace TestApp
                     { 
                         get
                         {
-                            return string.Empty;
+                            return ""Test1"";
+                        }
+                    }
+
+                    public string Type 
+                    { 
+                        get
+                        {
+                            return ""Test Types 1"";
+                        }
+                    }
+
+                    public void Execute(object dataContext)
+                    {
+                    }
+                }
+            ";
+
+            string codeToCompile1 = @"
+            using System;
+            using ScriptingEngine;
+
+                public class Writer : IExecutableScript
+                {
+                    public void OnRegistered()
+                    {
+                        Console.WriteLine($""you said 'TRETRESTRSTRE!'"");
+                    }
+
+                    public string Name 
+                    { 
+                        get
+                        {
+                            return ""Test2"";
+                        }
+                    }
+
+                    public string Type 
+                    { 
+                        get
+                        {
+                            return ""Test Types 1"";
+                        }
+                    }
+
+                    public void Execute(object dataContext)
+                    {
+                    }
+                }
+            ";
+
+            string codeToCompile2 = @"
+            using System;
+            using ScriptingEngine;
+
+                public class Writer : IExecutableScript
+                {
+                    public void OnRegistered()
+                    {
+                        Console.WriteLine($""you said 'TRETRESTRSTRE!'"");
+                    }
+
+                    public string Name 
+                    { 
+                        get
+                        {
+                            return ""Test3"";
+                        }
+                    }
+
+                    public string Type 
+                    { 
+                        get
+                        {
+                            return ""Test Types 33333333333"";
                         }
                     }
 
@@ -64,15 +138,37 @@ ScriptingEngine.RegisterScript(Calculator())";
 
             IronPythonScriptingEngine v = new IronPythonScriptingEngine();
 
-            Task.Run(() =>
+            v.WhenScriptRegistered.Subscribe(obs =>
             {
-                v.Initialize();
-                v.LoadScripts(@"C:\Test");
-                //v.WatchDirectory(@"C:\Test");
+                System.Diagnostics.Debug.WriteLine($"Registered script {obs.Name} -- {obs.FilePath}");
             });
 
+            v.WhenScriptUnregistered.Subscribe(obs =>
+            {
+                System.Diagnostics.Debug.WriteLine($"Unregistered script {obs}");
+            });
 
-            Thread.Sleep(240000);
+            v.WhenErrorOccurs.Subscribe(obs =>
+            {
+                System.Diagnostics.Debug.WriteLine($"Error: {obs.Message}");
+            });
+
+            v.WhenWarningOccurs.Subscribe(obs =>
+            {
+                System.Diagnostics.Debug.WriteLine($"Warning: {obs}");
+            });
+
+            //Task.Run(() =>
+            //{
+            //    v.Initialize();
+            //    //v.LoadAndExecuteRegister(pythonCode);
+            //    v.LoadScripts(@"C:\Test", true);
+            //    //v.ReloadScripts();
+            //    //v.WatchDirectory(@"C:\Test");
+            //});
+
+
+            //Thread.Sleep(60000);
 
             //Task.Run(() =>
             //{
@@ -86,9 +182,11 @@ ScriptingEngine.RegisterScript(Calculator())";
             //v.LoadAndExecuteRegister(codeToCompile);
             //v.ExecuteScript("Test", null);
 
-            //CSScriptEngine css = new CSScriptEngine();
-            //css.Initialize();
-            //css.LoadAndExecuteRegister(codeToCompile);
+            CSScriptEngine css = new CSScriptEngine();
+            css.Initialize();
+            css.LoadAndExecuteRegister(codeToCompile);
+            css.LoadAndExecuteRegister(codeToCompile1);
+            css.LoadAndExecuteRegister(codeToCompile2);
             //css.ExecuteScript("Test", null);
 
             //IronPythonScriptingEngine w = new IronPythonScriptingEngine();
