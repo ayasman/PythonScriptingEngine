@@ -1,4 +1,5 @@
 ﻿using IronPython.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Scripting.Hosting;
 using System;
 using System.Collections.Generic;
@@ -18,6 +19,14 @@ namespace ScriptingEngine
             lastRegistered = null;
             lastFile = null;
         }
+
+        public IronPythonScriptingEngine(ILogger logger) :
+            base(logger)
+        {
+            lastRegistered = null;
+            lastFile = null;
+        }
+
 
         public override bool Initialize()
         {

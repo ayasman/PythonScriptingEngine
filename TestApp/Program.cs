@@ -19,6 +19,11 @@ namespace TestApp
 
                 public class Writer : IExecutableScript
                 {
+                    public Writer(IScriptingEngine se)
+                    {
+                        se.LogDebug($""gfdsgfdsgfdsgfsd"");
+                    }
+
                     public void OnRegistered()
                     {
                         Console.WriteLine($""you said 'TRETRESTRSTRE!'"");
@@ -128,6 +133,7 @@ class Calculator(IDataScript, IExecutableScript):
     def get_Type(self):
 	    return 'AI Tester'
     def OnRegistered(this):
+        ScriptingEngine.LogDebug('fdsjfkdlsjflkdsjkl')
         return
     def get_Data(self):
 	    return Calculator()
@@ -182,16 +188,16 @@ ScriptingEngine.RegisterScript(Calculator())";
             //v.LoadAndExecuteRegister(codeToCompile);
             //v.ExecuteScript("Test", null);
 
-            CSScriptEngine css = new CSScriptEngine();
-            css.Initialize();
-            css.LoadAndExecuteRegister(codeToCompile);
-            css.LoadAndExecuteRegister(codeToCompile1);
-            css.LoadAndExecuteRegister(codeToCompile2);
+            //CSScriptEngine css = new CSScriptEngine();
+            //css.Initialize();
+            //css.LoadAndExecuteRegister(codeToCompile);
+            //css.LoadAndExecuteRegister(codeToCompile1);
+            //css.LoadAndExecuteRegister(codeToCompile2);
             //css.ExecuteScript("Test", null);
 
-            //IronPythonScriptingEngine w = new IronPythonScriptingEngine();
-            //w.Initialize();
-            //w.LoadAndExecuteRegister(pythonCode);
+            IronPythonScriptingEngine w = new IronPythonScriptingEngine();
+            w.Initialize();
+            w.LoadAndExecuteRegister(pythonCode);
             //var retret = w.ExecuteScript("Test");
             //w.ExecuteScript("Test", null);
 

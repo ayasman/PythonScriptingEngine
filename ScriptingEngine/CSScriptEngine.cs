@@ -1,4 +1,5 @@
 ﻿using CSScriptLibrary;
+using Microsoft.Extensions.Logging;
 using System;
 
 namespace ScriptingEngine
@@ -15,6 +16,13 @@ namespace ScriptingEngine
             lastFile = null;
         }
 
+        public CSScriptEngine(ILogger logger) :
+            base(logger)
+        {
+            lastRegistered = null;
+            lastFile = null;
+        }
+
         public override bool Initialize()
         {
             return base.Initialize();
@@ -24,7 +32,7 @@ namespace ScriptingEngine
         {
             try
             {
-                dynamic newObject = CSScript.RoslynEvaluator.LoadCode(scriptText);
+                dynamic newObject = CSScript.RoslynEvaluator.LoadCode(scriptText, this);
                 RegisterScript(newObject);
 
                 if (lastRegistered == null)

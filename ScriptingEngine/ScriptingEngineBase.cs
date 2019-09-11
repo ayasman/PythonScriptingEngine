@@ -1,4 +1,5 @@
 ﻿using Microsoft.CodeAnalysis;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -25,8 +26,18 @@ namespace ScriptingEngine
         private List<FileSystemWatcher> directoryWatchers = new List<FileSystemWatcher>();
         private List<IDisposable> watcherDisposables = new List<IDisposable>();
 
+        protected ILogger Logger { get; private set; } = null;
+
         public ScriptingEngineBase()
         {
+        }
+
+        public ScriptingEngineBase(ILogger logger)
+        {
+            Logger = logger;
+
+            WhenErrorOccurs.Subscribe(ex => Logger?.LogError(ex, "Error occured in Scripting Engine"));
+            WhenWarningOccurs.Subscribe(msg => Logger?.LogWarning(msg));
         }
 
         public IObservable<Exception> WhenErrorOccurs => onError.Publish().RefCount();
@@ -386,6 +397,26 @@ namespace ScriptingEngine
             directoryWatchers.Add(dirWatcher);
         }
 
+        public void LogDebug(string message)
+        {
+            Logger?.LogDebug(message);
+        }
+
+        public void LogInfo(string message)
+        {
+            Logger?.LogInformation(message);
+        }
+
+        public void LogWarning(string message)
+        {
+            Logger?.LogWarning(message);
+        }
+
+        public void LogError(string message)
+        {
+            Logger?.LogError(message);
+        }
+
         #region IDisposable Support
 
         protected bool disposedValue = false;
@@ -408,6 +439,7 @@ namespace ScriptingEngine
                 disposedValue = true;
             }
         }
+
         #endregion IDisposable Support
     }
 }
